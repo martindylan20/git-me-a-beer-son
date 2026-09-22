@@ -1,10 +1,17 @@
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 
 public class Git {
     public static void main(String[] args) {
-        init();
+        System.out.println(hashFile("./file.txt"));
     }
 
     public static void init() {
@@ -27,5 +34,25 @@ public class Git {
         } catch (Exception e) {
             System.err.println(e);
         }
+    }
+
+    public static String hashFile(String filePath) {
+    Path path = Paths.get(filePath);
+    StringBuilder read = new StringBuilder();
+    String hex = new String();
+    try (BufferedReader br = Files.newBufferedReader(path)) {
+        while (br.ready()) {
+            read.append((char) br.read());
+        }
+    } catch (Exception e) {
+      System.out.println("Error: No file was found at the given path");
+      return "";
+    }
+    try {
+      MessageDigest dig = MessageDigest.getInstance("SHA-1");
+      byte[] bytes = dig.digest(read.toString().getBytes(StandardCharsets.UTF_8));
+      hex = HexFormat.of().formatHex(bytes);
+    } catch (NoSuchAlgorithmException e) {};
+    return hex;
     }
 }
