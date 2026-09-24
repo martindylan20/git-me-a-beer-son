@@ -53,4 +53,8 @@ public class Git {
     } catch (NoSuchAlgorithmException e) {};
     return hex;
     }
+
+    public static void saveBlob() {
+        Path objects = Paths.get("./git/objects");
+    }
 }
