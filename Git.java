@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
@@ -16,10 +17,7 @@ import java.util.zip.GZIPOutputStream;
 
 public class Git {
     public static void main(String[] args) {
-        init();
-        System.out.println(hashFile("./Git.java"));
-        saveBlob("./Git.java");
-        System.out.println(decompressFile("./git/objects/" + hashFile("./Git.java")));
+        updateIndex("./Git.java");
     }
 
     public static void init() {
@@ -45,27 +43,25 @@ public class Git {
     }
 
     public static String hashFile(String filePath) {
-    Path path = Paths.get(filePath);
-    StringBuilder read = new StringBuilder();
-    String hex = new String();
-    try (BufferedReader br = Files.newBufferedReader(path)) {
-        while (br.ready()) {
-            read.append((char) br.read());
+        Path path = Paths.get(filePath);
+        String hex = new String();
+        try {
+            byte[] file = Files.readAllBytes(path);
+            MessageDigest dig = MessageDigest.getInstance("SHA-1");
+            byte[] bytes = dig.digest(file);
+            hex = HexFormat.of().formatHex(bytes);
+        } catch (Exception e) {
+            System.out.println("Error: No file was found at the given path");
         }
-    } catch (Exception e) {
-      System.out.println("Error: No file was found at the given path");
-      return "";
-    }
-    try {
-      MessageDigest dig = MessageDigest.getInstance("SHA-1");
-      byte[] bytes = dig.digest(read.toString().getBytes(StandardCharsets.UTF_8));
-      hex = HexFormat.of().formatHex(bytes);
-    } catch (NoSuchAlgorithmException e) {};
-    return hex;
+        return hex;
     }
 
     public static void saveBlob(String filePath) {
         Path path = Paths.get(filePath);
+        if (!Files.exists(Paths.get("./git/objects"))) {
+            System.out.println("Error: Repository has not been initialized");
+            return;
+        }
         byte[] file;
         try {
             file = Files.readAllBytes(path);
@@ -77,6 +73,39 @@ public class Git {
         try {
             Files.write(save, compress(file));
         } catch (IOException e) {}
+    }
+
+    public static void updateIndex(String filePath) {
+        Path home = Paths.get("..").toAbsolutePath();
+        Path indexPath = Paths.get("./git/index");
+        if (!Files.exists(indexPath)) {
+            System.out.println("Error: Repository has not been initialized");
+            return;
+        }
+        String hash = hashFile(filePath);
+        boolean add = true;
+        String[][] index = null;
+        try (BufferedReader br = new BufferedReader(Files.newBufferedReader(indexPath))) {
+            index = new String[(int) Files.lines(indexPath).count()][2];
+            for (String[] line : index) {
+                String readLine = br.readLine();
+                line[0] = readLine.substring(0, readLine.indexOf(' '));
+                line[1] = readLine.substring(readLine.indexOf(' ')+1);
+            }
+        } catch (Exception e) {}
+        try (BufferedWriter bw = new BufferedWriter(Files.newBufferedWriter(indexPath))) {
+            StringBuilder print = new StringBuilder();
+            for (int i = 0; i < index.length; i++) {
+                if (index[i][1].equals(filePath) && !index[i][0].equals(hash)) {
+                    index[i][0] = hash;
+                    add = false;
+                } else if (index[i][1].equals(filePath) && index[i][0].equals(hash)) add = false;
+                print.append("\n" + index[i][0] + " " + index[i][1]);
+            }
+            if (add) print.append("\n" + hash + " " + home.getParent().getFileName() + filePath.substring(1));
+            bw.write(print.substring(1));
+            bw.close();
+        } catch (Exception e) {}
     }
 
     private static byte[] compress(byte[] file) {
@@ -97,6 +126,8 @@ public class Git {
         return null;
     }
     public static String decompressFile(String filePath) {
+        // public wrapper of private decompress() method
+        // interprets byte array from decompress() method and returns as string
         try {
             byte[] file = Files.readAllBytes(Paths.get(filePath));
             byte[] decomp = decompress(file);
@@ -107,6 +138,8 @@ public class Git {
         return null;
     }
     private static byte[] decompress(byte[] file) {
+        // input compressed byte array from file to decompress
+        // output decompressed byte array
         try (ByteArrayInputStream byteIS = new ByteArrayInputStream(file);
             GZIPInputStream gzIS = new GZIPInputStream(byteIS);
         ) {
