@@ -17,7 +17,7 @@ import java.util.zip.GZIPOutputStream;
 
 public class Git {
     public static void main(String[] args) {
-        updateIndex("./Git.java");
+        
     }
 
     public static void init() {
@@ -43,6 +43,7 @@ public class Git {
     }
 
     public static String hashFile(String filePath) {
+        // returns hash of given file contents from path as a string
         Path path = Paths.get(filePath);
         String hex = new String();
         try {
@@ -57,6 +58,9 @@ public class Git {
     }
 
     public static void saveBlob(String filePath) {
+        // saves a given file at path to blob in ./git/objects
+        // implements gzip encoding through compress() 
+        // with decompress() useful for future implementation
         Path path = Paths.get(filePath);
         if (!Files.exists(Paths.get("./git/objects"))) {
             System.out.println("Error: Repository has not been initialized");
@@ -72,7 +76,7 @@ public class Git {
         Path save = Paths.get("./git/objects/" + hashFile(filePath));
         try {
             Files.write(save, compress(file));
-        } catch (IOException e) {}
+        } catch (IOException e) {System.err.println(e);}
     }
 
     public static void updateIndex(String filePath) {
@@ -92,7 +96,7 @@ public class Git {
                 line[0] = readLine.substring(0, readLine.indexOf(' '));
                 line[1] = readLine.substring(readLine.indexOf(' ')+1);
             }
-        } catch (Exception e) {}
+        } catch (Exception e) {System.err.println(e);}
         try (BufferedWriter bw = new BufferedWriter(Files.newBufferedWriter(indexPath))) {
             StringBuilder print = new StringBuilder();
             for (int i = 0; i < index.length; i++) {
@@ -104,20 +108,31 @@ public class Git {
             }
             if (add) print.append("\n" + hash + " " + home.getParent().getFileName() + filePath.substring(1));
             bw.write(print.substring(1));
-            bw.close();
-        } catch (Exception e) {}
+        } catch (Exception e) {System.err.println(e);}
+    }
+
+    public static String compressFile(String filePath) {
+        // public wrapper for compress() method, not currently used
+        Path path = Paths.get(filePath);
+        byte[] file;
+        try {
+            file = Files.readAllBytes(path);
+        } catch (Exception e) {
+            System.out.println("Error: No file was found at the given path");
+            return null;
+        }
+        return compress(file).toString();
     }
 
     private static byte[] compress(byte[] file) {
         // input byte array from file to compress
         // output compressed byte array
+        // compression uses gzip
         try (
             ByteArrayOutputStream byteOS = new ByteArrayOutputStream(file.length);
             GZIPOutputStream gzOS = new GZIPOutputStream(byteOS);
         ) {
            gzOS.write(file);
-           gzOS.close();
-           byteOS.close();
 
            byte[] output = byteOS.toByteArray();
            return output;
@@ -125,6 +140,7 @@ public class Git {
         }
         return null;
     }
+
     public static String decompressFile(String filePath) {
         // public wrapper of private decompress() method
         // interprets byte array from decompress() method and returns as string
@@ -137,10 +153,12 @@ public class Git {
         }
         return null;
     }
+
     private static byte[] decompress(byte[] file) {
         // input compressed byte array from file to decompress
         // output decompressed byte array
-        try (ByteArrayInputStream byteIS = new ByteArrayInputStream(file);
+        try (
+            ByteArrayInputStream byteIS = new ByteArrayInputStream(file);
             GZIPInputStream gzIS = new GZIPInputStream(byteIS);
         ) {
             byte[] buffer = new byte[1024];
@@ -150,12 +168,8 @@ public class Git {
             while ((len = gzIS.read(buffer)) > 0) {
                 out.write(buffer, 0, len);
             }
-
-            gzIS.close();
-            out.close();
             return out.toByteArray();
-        } catch (Exception e) {
-        }
+        } catch (Exception e) {System.err.println(e);}
         return null;
     }
 }
