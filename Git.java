@@ -11,13 +11,32 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 public class Git {
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
+        init();
+        saveBlob("./Git.java");
+        updateIndex("./Git.java");
 
+        saveBlob("./git/head");
+        updateIndex("./git/head");
+
+        saveBlob("./readme.md");
+        updateIndex("./readme.md");
+
+        var entries = Files.readAllLines(Path.of("./git/index"));
+        var tree = new StageTree(entries);
+        var to_write = tree.build_index(new StageTree.StageFolder(Path.of("git-me-a-beer-son")));
+
+        System.out.println();
+
+        Files.write(Path.of("./git/index"), to_write.getBytes());
     }
 
     public static void init() {
@@ -29,11 +48,14 @@ public class Git {
             if (Files.exists(objPath) && Files.exists(indexPath) && Files.exists(headPath)) {
                 System.out.println("Git Repository Already Exists");
                 return;
-            } if (!Files.exists(objPath)) {
+            }
+            if (!Files.exists(objPath)) {
                 Files.createDirectories(objPath);
-            } if (!Files.exists(indexPath)) {
+            }
+            if (!Files.exists(indexPath)) {
                 Files.createFile(indexPath);
-            } if (!Files.exists(headPath)) {
+            }
+            if (!Files.exists(headPath)) {
                 Files.createFile(headPath);
             }
             System.out.println("Git Repository Created");
@@ -42,24 +64,9 @@ public class Git {
         }
     }
 
-    public static String hashFile(String filePath) {
-        // returns hash of given file contents from path as a string
-        Path path = Paths.get(filePath);
-        String hex = new String();
-        try {
-            byte[] file = Files.readAllBytes(path);
-            MessageDigest dig = MessageDigest.getInstance("SHA-1");
-            byte[] bytes = dig.digest(file);
-            hex = HexFormat.of().formatHex(bytes);
-        } catch (Exception e) {
-            System.out.println("Error: No file was found at the given path");
-        }
-        return hex;
-    }
-
     public static void saveBlob(String filePath) {
         // saves a given file at path to blob in ./git/objects
-        // implements gzip encoding through compress() 
+        // implements gzip encoding through compress()
         // with decompress() useful for future implementation
         Path path = Paths.get(filePath);
         if (!Files.exists(Paths.get("./git/objects"))) {
@@ -73,10 +80,12 @@ public class Git {
             System.out.println("Error: No file was found at the given path");
             return;
         }
-        Path save = Paths.get("./git/objects/" + hashFile(filePath));
+        Path save = Paths.get("./git/objects/" + HashFile.hashFile(filePath));
         try {
             Files.write(save, compress(file));
-        } catch (IOException e) {System.err.println(e);}
+        } catch (IOException e) {
+            System.err.println(e);
+        }
     }
 
     public static void updateIndex(String filePath) {
@@ -86,7 +95,7 @@ public class Git {
             System.out.println("Error: Repository has not been initialized");
             return;
         }
-        String hash = hashFile(filePath);
+        String hash = HashFile.hashFile(filePath);
         boolean add = true;
         String[][] index = null;
         try (BufferedReader br = new BufferedReader(Files.newBufferedReader(indexPath))) {
@@ -94,21 +103,31 @@ public class Git {
             for (String[] line : index) {
                 String readLine = br.readLine();
                 line[0] = readLine.substring(0, readLine.indexOf(' '));
-                line[1] = readLine.substring(readLine.indexOf(' ')+1);
+                line[1] = readLine.substring(readLine.indexOf(' ') + 1);
             }
-        } catch (Exception e) {System.err.println(e);}
+        } catch (Exception e) {
+            System.err.println(e);
+        }
         try (BufferedWriter bw = new BufferedWriter(Files.newBufferedWriter(indexPath))) {
             StringBuilder print = new StringBuilder();
             for (int i = 0; i < index.length; i++) {
-                if (index[i][1].equals(filePath) && !index[i][0].equals(hash)) {
+                if (index[i][1].equals(home.getParent().getFileName() + filePath.substring(1))
+                        && !index[i][0].equals(hash)) {
                     index[i][0] = hash;
                     add = false;
-                } else if (index[i][1].equals(filePath) && index[i][0].equals(hash)) add = false;
+                } else if (index[i][1]
+                        .equals(home.getParent().getFileName() + filePath.substring(1))
+                        && index[i][0].equals(hash))
+                    add = false;
                 print.append("\n" + index[i][0] + " " + index[i][1]);
             }
-            if (add) print.append("\n" + hash + " " + home.getParent().getFileName() + filePath.substring(1));
+            if (add)
+                print.append(
+                        "\n" + hash + " " + home.getParent().getFileName() + filePath.substring(1));
             bw.write(print.substring(1));
-        } catch (Exception e) {System.err.println(e);}
+        } catch (Exception e) {
+            System.err.println(e);
+        }
     }
 
     public static String compressFile(String filePath) {
@@ -121,17 +140,15 @@ public class Git {
             System.out.println("Error: No file was found at the given path");
             return null;
         }
-        return compress(file).toString();
+        return file.toString(); //compress(file).toString();
     }
 
     private static byte[] compress(byte[] file) {
         // input byte array from file to compress
         // output compressed byte array
         // compression uses gzip
-        try (
-            ByteArrayOutputStream byteOS = new ByteArrayOutputStream(file.length);
-            GZIPOutputStream gzOS = new GZIPOutputStream(byteOS);
-        ) {
+        try (ByteArrayOutputStream byteOS = new ByteArrayOutputStream(file.length);
+                GZIPOutputStream gzOS = new GZIPOutputStream(byteOS);) {
             gzOS.write(file);
             gzOS.close();
             byteOS.close();
@@ -159,10 +176,8 @@ public class Git {
     private static byte[] decompress(byte[] file) {
         // input compressed byte array from file to decompress
         // output decompressed byte array
-        try (
-            ByteArrayInputStream byteIS = new ByteArrayInputStream(file);
-            GZIPInputStream gzIS = new GZIPInputStream(byteIS);
-        ) {
+        try (ByteArrayInputStream byteIS = new ByteArrayInputStream(file);
+                GZIPInputStream gzIS = new GZIPInputStream(byteIS);) {
             byte[] buffer = new byte[1024];
             ByteArrayOutputStream out = new ByteArrayOutputStream();
 
@@ -173,7 +188,9 @@ public class Git {
             gzIS.close();
             out.close();
             return out.toByteArray();
-        } catch (Exception e) {System.err.println(e);}
+        } catch (Exception e) {
+            System.err.println(e);
+        }
         return null;
     }
 }
