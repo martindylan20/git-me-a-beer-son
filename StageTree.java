@@ -49,15 +49,43 @@ public class StageTree {
             if (item instanceof StageFile file) {
                 contents.add(file.toString());
             } else if (item instanceof StageFolder folder) {
-                var content = build_index(folder);
-                var hash = HashFile.hashString(content);
-                contents.add("tree " + hash + " " + item.path());
-
-                Files.writeString(Path.of("./git/objects/" + hash), content);
+                var content = build_index_recursive(folder);
+                // var hash = HashFile.hashString(content);
+                // contents.add("tree " + hash + " " + item.path());
+                contents.add(content);
+                // System.out.println("content: " + content);
             }
         }
 
-        return String.join("\n", contents);
+        String finalContents = String.join("\n", contents);
+        Files.writeString(Path.of("./git/objects/" + HashFile.hashString(finalContents)), finalContents);
+        return "tree " + HashFile.hashString(finalContents) + " git-me-a-beer-son";
+    }
+
+    String build_index_recursive(StageFolder dir) throws IOException {
+        var items = entriesMap.get(dir.path());
+
+        var contents = new ArrayList<String>();
+        for (var item : items) {
+            if (item instanceof StageFile file) {
+                contents.add(file.toString());
+            } else if (item instanceof StageFolder folder) {
+                var content = build_index_recursive(folder);
+                // var hash = HashFile.hashString(content);
+                // contents.add("tree " + hash + " " + item.path());
+                contents.add(content);
+
+
+                // System.out.println("content: " + content);
+            }
+        }
+
+        String finalContents = String.join("\n", contents);
+        String hashedContents = HashFile.hashString(finalContents);
+        Files.writeString(Path.of("./git/objects/" + hashedContents), finalContents);
+        String[] rootFolder = dir.path.toString().split("/");
+        return "tree " + hashedContents + " "
+                + rootFolder[rootFolder.length - 1];
     }
 
     interface StageItem {

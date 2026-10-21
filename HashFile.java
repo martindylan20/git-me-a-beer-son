@@ -14,10 +14,11 @@ public class HashFile {
             MessageDigest dig = MessageDigest.getInstance("SHA-1");
             byte[] bytes = dig.digest(file);
             hex = HexFormat.of().formatHex(bytes);
+            return hex;
         } catch (Exception e) {
-            System.out.println("Error: No file was found at the given path");
+            System.out.println(e);
         }
-        return hex;
+        return null;
     }
 
     public static String hashString(String toHash) {
@@ -27,10 +28,10 @@ public class HashFile {
             MessageDigest dig = MessageDigest.getInstance("SHA-1");
             byte[] bytes = dig.digest(file);
             hex = HexFormat.of().formatHex(bytes);
+            return hex;
         } catch (Exception e) {
-            System.out.println("Error: No file was found at the given path");
+            // System.out.println("Error: No file was found at the given path");
         }
-
-        return hex;
+        return null;
     }
 }
